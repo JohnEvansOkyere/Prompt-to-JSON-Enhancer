@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt-to-JSON Enhancer</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-icon">🚀</span>
+                    <h1>Prompt Enhancer</h1>
+                </div>
+                <p class="tagline">Transform simple prompts into structured, powerful AI instructions</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Application -->
+    <main class="main">
+        <div class="container">
+            <!-- Status Bar -->
+            <div id="statusBar" class="status-bar">
+                <div class="status-content">
+                    <span id="statusText">Ready to enhance your prompts</span>
+                    <div id="statusIcon" class="status-icon">✓</div>
+                </div>
+            </div>
+
+            <!-- Input Section -->
+            <section class="input-section">
+                <div class="section-header">
+                    <h2>Original Prompt</h2>
+                    <div class="word-count">
+                        <span id="inputWordCount">0</span> words
+                    </div>
+                </div>
+                
+                <div class="input-container">
+                    <textarea 
+                        id="originalPrompt" 
+                        class="prompt-input" 
+                        placeholder="Enter your prompt here... For example: 'Write a blog post about dogs' or 'Help me create a marketing strategy'"
+                        maxlength="5000"
+                    ></textarea>
+                    
+                    <div class="input-controls">
+                        <div class="control-group">
+                            <label for="enhancementType">Enhancement Type:</label>
+                            <select id="enhancementType" class="control-select">
+                                <option value="general">General Enhancement</option>
+                                <option value="creative">Creative Writing</option>
+                                <option value="technical">Technical/Coding</option>
+                                <option value="business">Business/Marketing</option>
+                                <option value="educational">Educational</option>
+                            </select>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label for="targetAudience">Target Audience:</label>
+                            <select id="targetAudience" class="control-select">
+                                <option value="general">General Audience</option>
+                                <option value="beginner">Beginner</option>
+                                <option value="intermediate">Intermediate</option>
+                                <option value="expert">Expert/Professional</option>
+                                <option value="student">Student</option>
+                                <option value="business">Business Professional</option>
+                            </select>
+                        </div>
+                        
+                        <button id="enhanceBtn" class="enhance-btn" disabled>
+                            <span class="btn-text">Enhance Prompt</span>
+                            <span class="btn-loader"></span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section id="resultsSection" class="results-section" style="display: none;">
+                <!-- Enhancement Overview -->
+                <div class="enhancement-overview">
+                    <div class="overview-card">
+                        <h3>Enhancement Summary</h3>
+                        <div class="metrics">
+                            <div class="metric">
+                                <span class="metric-label">Improvement</span>
+                                <span id="improvementScore" class="metric-value">0%</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Original Words</span>
+                                <span id="originalWordCount" class="metric-value">0</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Enhanced Words</span>
+                                <span id="enhancedWordCount" class="metric-value">0</span>
+                            </div>
+                        </div>
+                        <div class="improvements-list">
+                            <h4>Key Improvements:</h4>
+                            <ul id="improvementsList"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Enhanced Prompt -->
+                <div class="output-section">
+                    <div class="section-header">
+                        <h2>Enhanced Prompt</h2>
+                        <button id="copyEnhancedBtn" class="copy-btn">
+                            <span class="copy-icon">📋</span>
+                            Copy Enhanced Prompt
+                        </button>
+                    </div>
+                    <div class="output-container">
+                        <div id="enhancedPrompt" class="prompt-output"></div>
+                    </div>
+                </div>
+
+                <!-- Structured Breakdown -->
+                <div class="structure-section">
+                    <div class="section-header">
+                        <h2>Structured Breakdown</h2>
+                        <button id="copyStructureBtn" class="copy-btn secondary">
+                            <span class="copy-icon">📋</span>
+                            Copy JSON Structure
+                        </button>
+                    </div>
+                    
+                    <div class="structure-grid">
+                        <div class="structure-card">
+                            <h4>Context</h4>
+                            <div id="structureContext" class="structure-content"></div>
+                        </div>
+                        
+                        <div class="structure-card">
+                            <h4>Objective</h4>
+                            <div id="structureObjective" class="structure-content"></div>
+                        </div>
+                        
+                        <div class="structure-card">
+                            <h4>Requirements</h4>
+                            <ul id="structureRequirements" class="structure-list"></ul>
+                        </div>
+                        
+                        <div class="structure-card">
+                            <h4>Target Audience</h4>
+                            <div id="structureAudience" class="structure-content"></div>
+                        </div>
+                        
+                        <div class="structure-card">
+                            <h4>Output Format</h4>
+                            <div id="structureFormat" class="structure-content"></div>
+                        </div>
+                        
+                        <div class="structure-card">
+                            <h4>Tone & Style</h4>
+                            <div id="structureTone" class="structure-content"></div>
+                        </div>
+                        
+                        <div class="structure-card" id="examplesCard" style="display: none;">
+                            <h4>Examples</h4>
+                            <ul id="structureExamples" class="structure-list"></ul>
+                        </div>
+                        
+                        <div class="structure-card" id="constraintsCard" style="display: none;">
+                            <h4>Constraints</h4>
+                            <ul id="structureConstraints" class="structure-list"></ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Usage Tips -->
+                <div class="tips-section">
+                    <div class="section-header">
+                        <h2>Usage Tips</h2>
+                    </div>
+                    <div class="tips-container">
+                        <ul id="usageTips" class="tips-list"></ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Example Section -->
+            <section class="examples-section">
+                <div class="section-header">
+                    <h2>Try These Examples</h2>
+                    <p>Click on any example to load it into the input field</p>
+                </div>
+                
+                <div class="examples-grid">
+                    <div class="example-card" data-prompt="Write a blog post about dogs">
+                        <div class="example-type">General</div>
+                        <div class="example-text">"Write a blog post about dogs"</div>
+                        <div class="example-description">Simple creative writing request</div>
+                    </div>
+                    
+                    <div class="example-card" data-prompt="Help me create a marketing strategy for my startup">
+                        <div class="example-type">Business</div>
+                        <div class="example-text">"Help me create a marketing strategy for my startup"</div>
+                        <div class="example-description">Business planning request</div>
+                    </div>
+                    
+                    <div class="example-card" data-prompt="Write a Python function to sort a list">
+                        <div class="example-type">Technical</div>
+                        <div class="example-text">"Write a Python function to sort a list"</div>
+                        <div class="example-description">Programming task</div>
+                    </div>
+                    
+                    <div class="example-card" data-prompt="Explain machine learning to a beginner">
+                        <div class="example-type">Educational</div>
+                        <div class="example-text">"Explain machine learning to a beginner"</div>
+                        <div class="example-description">Teaching and explanation</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <p>&copy; 2025 Prompt-to-JSON Enhancer. Built for AISoftDevs Internship.</p>
+                <div class="footer-links">
+                    <a href="https://github.com/yourusername/prompt-to-json-enhancer" target="_blank">GitHub</a>
+                    <a href="#" id="aboutLink">About</a>
+                    <a href="#" id="apiDocsLink">API Docs</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p>Enhancing your prompt...</p>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- About Modal -->
+    <div id="aboutModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>About Prompt-to-JSON Enhancer</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>This tool transforms simple prompts into structured, highly effective AI instructions using Claude AI.</p>
+                <h4>Features:</h4>
+                <ul>
+                    <li>Smart prompt analysis and enhancement</li>
+                    <li>Multiple enhancement types for different use cases</li>
+                    <li>Structured JSON breakdown of prompt components</li>
+                    <li>Usage tips and improvement suggestions</li>
+                    <li>Copy-friendly output formats</li>
+                </ul>
+                <h4>How it works:</h4>
+                <ol>
+                    <li>Enter your basic prompt</li>
+                    <li>Select enhancement type and target audience</li>
+                    <li>Get a structured, powerful prompt ready for any AI</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -250,4 +250,312 @@ class APIQueue {
             .then(resolve)
             .catch(reject)
             .finally(() => {
-                this.running = this.running.filter(p => p !==
+                this.running = this.running.filter(p => p !== promise);
+                this.process(); // Process next item in queue
+            });
+
+        this.running.push(promise);
+        this.process(); // Try to process more items
+    }
+
+    /**
+     * Get queue status
+     * @returns {Object} Queue status object
+     */
+    getStatus() {
+        return {
+            queued: this.queue.length,
+            running: this.running.length,
+            total: this.queue.length + this.running.length
+        };
+    }
+}
+
+// Create global API queue instance
+const apiQueue = new APIQueue(2); // Allow max 2 concurrent requests
+
+/**
+ * Queued API wrapper - automatically queues requests to prevent overload
+ */
+const QueuedAPI = {
+    /**
+     * Enhance prompt with queueing
+     * @param {Object} promptData - Prompt data
+     * @returns {Promise<Object>} Enhanced prompt response
+     */
+    enhancePrompt(promptData) {
+        return apiQueue.add(() => API.enhancePrompt(promptData));
+    },
+
+    /**
+     * Test connection with queueing
+     * @returns {Promise<boolean>} Connection status
+     */
+    testConnection() {
+        return apiQueue.add(() => API.testConnection());
+    },
+
+    /**
+     * Get health status with queueing
+     * @returns {Promise<Object>} Health status
+     */
+    getHealthStatus() {
+        return apiQueue.add(() => API.getHealthStatus());
+    },
+
+    /**
+     * Get templates with queueing
+     * @returns {Promise<Object>} Templates object
+     */
+    getTemplates() {
+        return apiQueue.add(() => API.getTemplates());
+    },
+
+    /**
+     * Get queue status
+     * @returns {Object} Queue status
+     */
+    getQueueStatus() {
+        return apiQueue.getStatus();
+    }
+};
+
+/**
+ * API event emitter for handling API events
+ */
+class APIEventEmitter {
+    constructor() {
+        this.events = {};
+    }
+
+    /**
+     * Subscribe to API events
+     * @param {string} event - Event name
+     * @param {Function} callback - Callback function
+     */
+    on(event, callback) {
+        if (!this.events[event]) {
+            this.events[event] = [];
+        }
+        this.events[event].push(callback);
+    }
+
+    /**
+     * Unsubscribe from API events
+     * @param {string} event - Event name
+     * @param {Function} callback - Callback function
+     */
+    off(event, callback) {
+        if (this.events[event]) {
+            this.events[event] = this.events[event].filter(cb => cb !== callback);
+        }
+    }
+
+    /**
+     * Emit API event
+     * @param {string} event - Event name
+     * @param {*} data - Event data
+     */
+    emit(event, data) {
+        if (this.events[event]) {
+            this.events[event].forEach(callback => {
+                try {
+                    callback(data);
+                } catch (error) {
+                    console.error(`Error in event callback for ${event}:`, error);
+                }
+            });
+        }
+    }
+}
+
+// Create global API event emitter
+const apiEvents = new APIEventEmitter();
+
+/**
+ * Enhanced API wrapper with events and caching
+ */
+const EnhancedAPI = {
+    cache: new Map(),
+    cacheTimeout: 5 * 60 * 1000, // 5 minutes
+
+    /**
+     * Get cached data or fetch from API
+     * @param {string} key - Cache key
+     * @param {Function} fetchFn - Function to fetch data
+     * @param {number} timeout - Cache timeout override
+     * @returns {Promise<*>} Cached or fetched data
+     */
+    async getCached(key, fetchFn, timeout = this.cacheTimeout) {
+        const cached = this.cache.get(key);
+        const now = Date.now();
+
+        if (cached && (now - cached.timestamp) < timeout) {
+            return cached.data;
+        }
+
+        try {
+            const data = await fetchFn();
+            this.cache.set(key, { data, timestamp: now });
+            return data;
+        } catch (error) {
+            // Return cached data if available, even if expired
+            if (cached) {
+                console.warn('API request failed, using cached data:', error);
+                return cached.data;
+            }
+            throw error;
+        }
+    },
+
+    /**
+     * Clear cache
+     * @param {string} key - Specific key to clear, or all if not provided
+     */
+    clearCache(key = null) {
+        if (key) {
+            this.cache.delete(key);
+        } else {
+            this.cache.clear();
+        }
+    },
+
+    /**
+     * Enhanced prompt enhancement with events
+     * @param {Object} promptData - Prompt data
+     * @returns {Promise<Object>} Enhanced prompt response
+     */
+    async enhancePrompt(promptData) {
+        try {
+            apiEvents.emit('enhance:start', promptData);
+            
+            const result = await QueuedAPI.enhancePrompt(promptData);
+            
+            apiEvents.emit('enhance:success', { promptData, result });
+            return result;
+            
+        } catch (error) {
+            apiEvents.emit('enhance:error', { promptData, error });
+            throw error;
+        }
+    },
+
+    /**
+     * Get templates with caching
+     * @returns {Promise<Object>} Templates object
+     */
+    async getTemplates() {
+        return this.getCached('templates', () => API.getTemplates(), 30 * 60 * 1000); // Cache for 30 minutes
+    },
+
+    /**
+     * Get health status with caching
+     * @returns {Promise<Object>} Health status
+     */
+    async getHealthStatus() {
+        return this.getCached('health', () => API.getHealthStatus(), 60 * 1000); // Cache for 1 minute
+    },
+
+    /**
+     * Test connection
+     * @returns {Promise<boolean>} Connection status
+     */
+    testConnection() {
+        return QueuedAPI.testConnection();
+    },
+
+    /**
+     * Subscribe to API events
+     * @param {string} event - Event name
+     * @param {Function} callback - Callback function
+     */
+    on(event, callback) {
+        apiEvents.on(event, callback);
+    },
+
+    /**
+     * Unsubscribe from API events
+     * @param {string} event - Event name
+     * @param {Function} callback - Callback function
+     */
+    off(event, callback) {
+        apiEvents.off(event, callback);
+    }
+};
+
+/**
+ * Offline detection and handling
+ */
+class OfflineHandler {
+    constructor() {
+        this.isOnline = navigator.onLine;
+        this.pendingRequests = [];
+
+        // Listen for online/offline events
+        window.addEventListener('online', () => {
+            this.isOnline = true;
+            this.processPendingRequests();
+            apiEvents.emit('connection:online');
+        });
+
+        window.addEventListener('offline', () => {
+            this.isOnline = false;
+            apiEvents.emit('connection:offline');
+        });
+    }
+
+    /**
+     * Add request to pending queue when offline
+     * @param {Function} requestFn - Request function
+     * @returns {Promise} Promise that resolves when back online
+     */
+    addPendingRequest(requestFn) {
+        return new Promise((resolve, reject) => {
+            this.pendingRequests.push({ requestFn, resolve, reject });
+        });
+    }
+
+    /**
+     * Process pending requests when back online
+     */
+    async processPendingRequests() {
+        if (!this.isOnline || this.pendingRequests.length === 0) {
+            return;
+        }
+
+        const requests = [...this.pendingRequests];
+        this.pendingRequests = [];
+
+        for (const { requestFn, resolve, reject } of requests) {
+            try {
+                const result = await requestFn();
+                resolve(result);
+            } catch (error) {
+                reject(error);
+            }
+        }
+    }
+
+    /**
+     * Check if online
+     * @returns {boolean} Online status
+     */
+    getOnlineStatus() {
+        return this.isOnline;
+    }
+}
+
+// Create global offline handler
+const offlineHandler = new OfflineHandler();
+
+/**
+ * Export API modules for use in other scripts
+ */
+window.API = API;
+window.QueuedAPI = QueuedAPI;
+window.EnhancedAPI = EnhancedAPI;
+window.APIError = APIError;
+window.OfflineHandler = offlineHandler;
+
+// Export configuration for easy modification
+window.API_CONFIG = API_CONFIG;

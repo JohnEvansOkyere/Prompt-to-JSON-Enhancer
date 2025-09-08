@@ -1,21 +1,19 @@
 # FastAPI and web server
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+fastapi
+uvicorn[standard]
 
 # HTTP client for API calls
-httpx==0.25.2
+httpx
 
 # Data validation and parsing
-pydantic==2.5.0
+pydantic
 
-# Environment variables
-python-dotenv==1.0.0
 
 # CORS middleware (included with FastAPI but explicit for clarity)
 # fastapi already includes starlette which has CORS
 
 # Optional: For production deployment
-gunicorn==21.2.0
+gunicorn
 
 # Optional: For enhanced logging
-structlog==23.2.0
+structlog

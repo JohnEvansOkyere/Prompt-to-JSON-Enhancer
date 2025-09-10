@@ -17,3 +17,7 @@ gunicorn
 
 # Optional: For enhanced logging
 structlog
+
+# Environment variable management
+python-dotenv
+

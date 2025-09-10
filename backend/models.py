@@ -176,9 +176,9 @@ class HealthResponse(BaseModel):
         description="Overall health status: healthy, degraded, unhealthy"
     )
     
-    claude_api: str = Field(
+    grok_api: str = Field(
         ...,
-        description="Claude API connection status"
+        description="Grok API connection status"
     )
     
     version: str = Field(

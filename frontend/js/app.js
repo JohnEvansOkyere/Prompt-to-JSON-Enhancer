@@ -318,6 +318,12 @@ async function loadTemplates() {
 async function testAPIConnection() {
     try {
         console.log('Testing API connection...');
+        console.log('API Base URL:', window.API_CONFIG.BASE_URL);
+        
+        // First test basic connectivity
+        const healthUrl = `${window.API_CONFIG.BASE_URL}/health`;
+        console.log('Testing health endpoint:', healthUrl);
+        
         const isConnected = await EnhancedAPI.testConnection();
         if (isConnected) {
             Utils.updateStatus('Connected to AI service', 'success');
@@ -330,6 +336,7 @@ async function testAPIConnection() {
     } catch (error) {
         console.error('API connection test failed:', error);
         Utils.updateStatus('Failed to connect to AI service', 'error');
+        Utils.showToast('Cannot connect to backend service. Make sure the backend is running on port 8000.', 'error', 10000);
     }
 }
 

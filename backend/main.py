@@ -1,7 +1,7 @@
 # main.py
 """
 FastAPI backend for Prompt-to-JSON Enhancer
-Handles API requests and integrates with Claude AI
+Handles API requests and integrates with Grok AI
 """
 
 from fastapi import FastAPI, HTTPException
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Initialize FastAPI app
 app = FastAPI(
     title="Prompt-to-JSON Enhancer API",
-    description="Transform simple prompts into structured JSON format for better AI interactions",
+    description="Transform simple prompts into structured JSON format for better AI interactions using Grok AI",
     version="1.0.0"
 )
 
@@ -43,7 +43,7 @@ prompt_service = PromptEnhancerService()
 @app.get("/")
 async def root():
     """Health check endpoint"""
-    return {"message": "Prompt-to-JSON Enhancer API is running!"}
+    return {"message": "Prompt-to-JSON Enhancer API is running with Grok AI!"}
 
 @app.post("/enhance-prompt", response_model=EnhancedPromptResponse)
 async def enhance_prompt(request: PromptRequest):
@@ -66,7 +66,7 @@ async def enhance_prompt(request: PromptRequest):
                 detail="Prompt must be at least 3 characters long"
             )
         
-        # Enhance the prompt using Claude AI
+        # Enhance the prompt using Grok AI
         enhanced_data = await prompt_service.enhance_prompt(
             original_prompt=request.original_prompt,
             enhancement_type=request.enhancement_type,
@@ -91,12 +91,12 @@ async def enhance_prompt(request: PromptRequest):
 async def health_check():
     """Detailed health check for monitoring"""
     try:
-        # Test Claude API connection
+        # Test Grok API connection
         api_status = await prompt_service.test_connection()
         
         return {
             "status": "healthy" if api_status else "degraded",
-            "claude_api": "connected" if api_status else "disconnected",
+            "grok_api": "connected" if api_status else "disconnected",
             "version": "1.0.0"
         }
     except Exception as e:

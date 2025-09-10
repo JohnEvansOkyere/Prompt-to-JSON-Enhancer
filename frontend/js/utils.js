@@ -53,8 +53,8 @@ function validatePrompt(prompt) {
     }
     
     const wordCount = countWords(trimmedPrompt);
-    if (wordCount < 2) {
-        return { isValid: false, message: 'Prompt must contain at least 2 words' };
+    if (wordCount < 1) {  // Changed from 2 to 1 word minimum
+        return { isValid: false, message: 'Prompt must contain at least 1 word' };
     }
     
     return { isValid: true, message: '' };

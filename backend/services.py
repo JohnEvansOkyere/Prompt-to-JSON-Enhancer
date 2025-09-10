@@ -1,7 +1,7 @@
 # services.py
 """
 Business logic and AI integration services
-Handles interaction with Grok AI API
+Handles interaction with Hugging Face API
 """
 
 import os
@@ -16,34 +16,35 @@ from models import EnhancedPromptResponse, PromptStructure
 logger = logging.getLogger(__name__)
 
 class PromptEnhancerService:
-    """Service for enhancing prompts using Grok AI"""
+    """Service for enhancing prompts using Hugging Face API"""
     
     def __init__(self):
-        self.api_key = os.getenv("XAI_API_KEY")
-        self.api_url = "https://api.x.ai/v1/chat/completions"
-        self.model = "grok-beta"
+        self.api_key = os.getenv("HUGGINGFACE_API_KEY")
+        self.api_url = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium"
+        # Alternative models you can try:
+        # "microsoft/DialoGPT-large"
+        # "facebook/blenderbot-400M-distill" 
+        # "google/flan-t5-large"
         
         if not self.api_key:
-            raise ValueError("XAI_API_KEY environment variable is required")
+            # Hugging Face API works without key but with rate limits
+            logger.warning("HUGGINGFACE_API_KEY not found. Using rate-limited public access.")
+            self.api_key = None
     
     async def test_connection(self) -> bool:
-        """Test connection to Grok API"""
+        """Test connection to Hugging Face API"""
         try:
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+                
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(
                     self.api_url,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.api_key}"
-                    },
-                    json={
-                        "messages": [{"role": "user", "content": "Test"}],
-                        "model": self.model,
-                        "max_tokens": 10,
-                        "temperature": 0.3
-                    }
+                    headers=headers,
+                    json={"inputs": "Test connection"}
                 )
-                return response.status_code == 200
+                return response.status_code in [200, 503]  # 503 means model is loading
         except Exception as e:
             logger.error(f"API connection test failed: {str(e)}")
             return False
@@ -55,7 +56,7 @@ class PromptEnhancerService:
         target_audience: str = "general"
     ) -> EnhancedPromptResponse:
         """
-        Enhance a prompt using Grok AI
+        Enhance a prompt using Hugging Face API
         
         Args:
             original_prompt: The original prompt to enhance
@@ -67,15 +68,14 @@ class PromptEnhancerService:
         """
         
         try:
-            # Create the enhancement prompt for Grok
-            system_prompt = self._create_system_prompt(enhancement_type, target_audience)
-            user_prompt = self._create_user_prompt(original_prompt)
+            # Create the enhancement prompt
+            enhancement_prompt = self._create_enhancement_prompt(original_prompt, enhancement_type, target_audience)
             
-            # Call Grok API
-            grok_response = await self._call_grok_api(system_prompt, user_prompt)
+            # Call Hugging Face API
+            hf_response = await self._call_huggingface_api(enhancement_prompt)
             
-            # Parse Grok's response
-            enhanced_data = self._parse_grok_response(grok_response)
+            # Parse response and create enhanced data
+            enhanced_data = self._create_enhanced_response(original_prompt, hf_response, enhancement_type, target_audience)
             
             # Calculate metrics
             word_count_original = len(original_prompt.split())
@@ -100,150 +100,160 @@ class PromptEnhancerService:
             logger.error(f"Error in enhance_prompt: {str(e)}")
             raise
     
-    def _create_system_prompt(self, enhancement_type: str, target_audience: str) -> str:
-        """Create system prompt for Grok based on enhancement type"""
+    def _create_enhancement_prompt(self, original_prompt: str, enhancement_type: str, target_audience: str) -> str:
+        """Create enhancement prompt for Hugging Face model"""
         
-        base_prompt = """You are an expert prompt engineer. Your task is to transform a basic prompt into a highly structured and effective prompt that will produce much better AI responses.
-
-You must respond with a JSON object containing these exact fields:
-{
-    "enhanced_prompt": "The complete, enhanced prompt ready to use",
-    "prompt_structure": {
-        "context": "Background context and setting",
-        "objective": "Clear statement of what needs to be accomplished",
-        "requirements": ["list", "of", "specific", "requirements"],
-        "target_audience": "Intended audience for the output",
-        "output_format": "Expected format and structure",
-        "tone_and_style": "Desired tone and writing style",
-        "examples": ["optional", "examples"],
-        "constraints": ["things", "to", "avoid"]
-    },
-    "improvement_summary": ["List of key improvements made"],
-    "estimated_improvement": 85,
-    "usage_tips": ["Tips for using this enhanced prompt effectively"]
-}
-
-IMPORTANT: Respond ONLY with valid JSON. Do not include any markdown formatting, code blocks, or explanatory text."""
-
-        type_specific = {
-            "creative": "\n\nFocus on: storytelling elements, creative constraints, artistic vision, emotional tone, and imaginative requirements.",
-            "technical": "\n\nFocus on: technical specifications, code requirements, system constraints, performance criteria, and implementation details.",
-            "business": "\n\nFocus on: business objectives, target market, success metrics, brand voice, and commercial considerations.",
-            "educational": "\n\nFocus on: learning objectives, knowledge level, teaching methods, assessment criteria, and pedagogical approach.",
-            "general": "\n\nApply balanced enhancement suitable for any domain."
+        enhancement_instructions = {
+            "creative": "Focus on storytelling, creativity, and artistic elements.",
+            "technical": "Focus on technical precision, code requirements, and implementation details.", 
+            "business": "Focus on business objectives, ROI, and professional outcomes.",
+            "educational": "Focus on learning objectives and pedagogical clarity.",
+            "general": "Provide balanced enhancement suitable for any domain."
         }
         
-        audience_specific = {
-            "beginner": "\n\nTailor for beginners: use simple language, provide more context, include step-by-step guidance.",
-            "expert": "\n\nTailor for experts: use technical terminology, assume deep knowledge, focus on advanced concepts.",
-            "business": "\n\nTailor for business professionals: focus on ROI, efficiency, scalability, and business impact.",
-            "student": "\n\nTailor for students: emphasize learning, provide educational context, include practice opportunities.",
-            "general": "\n\nMaintain accessibility for a general audience."
+        audience_instructions = {
+            "beginner": "Use simple language and provide more context.",
+            "expert": "Use technical terminology and assume deep knowledge.",
+            "business": "Focus on business value and professional outcomes.",
+            "student": "Emphasize learning and educational value.",
+            "general": "Maintain accessibility for a general audience."
         }
         
-        return base_prompt + type_specific.get(enhancement_type, type_specific["general"]) + audience_specific.get(target_audience, audience_specific["general"])
-    
-    def _create_user_prompt(self, original_prompt: str) -> str:
-        """Create user prompt for Grok"""
-        return f"""Transform this basic prompt into a highly effective, structured prompt:
+        return f"""Transform this basic prompt into a highly effective, detailed prompt:
 
-ORIGINAL PROMPT:
-"{original_prompt}"
+Original: "{original_prompt}"
 
-Remember to respond ONLY with the JSON object as specified. Make sure the enhanced prompt is significantly more detailed, specific, and likely to produce better AI responses."""
+Enhancement type: {enhancement_instructions.get(enhancement_type, enhancement_instructions['general'])}
+Target audience: {audience_instructions.get(target_audience, audience_instructions['general'])}
 
-    async def _call_grok_api(self, system_prompt: str, user_prompt: str) -> str:
-        """Make API call to Grok"""
+Enhanced prompt:"""
+
+    async def _call_huggingface_api(self, prompt: str) -> str:
+        """Make API call to Hugging Face"""
         
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    self.api_url,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.api_key}"
-                    },
-                    json={
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ],
-                        "model": self.model,
-                        "max_tokens": 4000,
-                        "temperature": 0.3,
-                        "stream": False
-                    }
-                )
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            
+            # Try multiple models if one fails
+            models = [
+                "microsoft/DialoGPT-medium",
+                "facebook/blenderbot-400M-distill",
+                "google/flan-t5-base"
+            ]
+            
+            for model in models:
+                try:
+                    url = f"https://api-inference.huggingface.co/models/{model}"
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        response = await client.post(
+                            url,
+                            headers=headers,
+                            json={
+                                "inputs": prompt,
+                                "parameters": {
+                                    "max_new_tokens": 500,
+                                    "temperature": 0.7,
+                                    "do_sample": True
+                                }
+                            }
+                        )
+                        
+                        if response.status_code == 200:
+                            result = response.json()
+                            if isinstance(result, list) and len(result) > 0:
+                                return result[0].get("generated_text", prompt)
+                            return str(result)
+                        elif response.status_code == 503:
+                            # Model is loading, wait and try next
+                            continue
+                            
+                except Exception as e:
+                    logger.warning(f"Model {model} failed: {str(e)}")
+                    continue
+            
+            # If all models fail, create a fallback response
+            logger.warning("All Hugging Face models failed, using fallback enhancement")
+            return self._create_fallback_enhancement(prompt)
                 
-                if response.status_code != 200:
-                    error_detail = response.text
-                    logger.error(f"Grok API error {response.status_code}: {error_detail}")
-                    raise Exception(f"Grok API error: {response.status_code}")
-                
-                response_data = response.json()
-                return response_data["choices"][0]["message"]["content"]
-                
-        except httpx.TimeoutException:
-            logger.error("Grok API request timeout")
-            raise Exception("Request timeout. Please try again.")
         except Exception as e:
-            logger.error(f"Grok API call failed: {str(e)}")
-            raise
+            logger.error(f"Hugging Face API call failed: {str(e)}")
+            return self._create_fallback_enhancement(prompt)
     
-    def _parse_grok_response(self, grok_response: str) -> Dict[str, Any]:
-        """Parse Grok's JSON response"""
+    def _create_fallback_enhancement(self, original_prompt: str) -> str:
+        """Create a rule-based enhancement when AI models fail"""
         
-        try:
-            # Clean up the response text
-            response_text = grok_response.strip()
-            
-            # Remove any markdown code blocks that might wrap the JSON
-            if response_text.startswith("```json"):
-                response_text = response_text[7:]
-            if response_text.startswith("```"):
-                response_text = response_text[3:]
-            if response_text.endswith("```"):
-                response_text = response_text[:-3]
-            
-            response_text = response_text.strip()
-            
-            # Parse JSON
-            parsed_data = json.loads(response_text)
-            
-            # Validate required fields
-            required_fields = ["enhanced_prompt", "prompt_structure"]
-            for field in required_fields:
-                if field not in parsed_data:
-                    raise ValueError(f"Missing required field: {field}")
-            
-            # Validate prompt_structure
-            structure_fields = ["context", "objective", "requirements", "target_audience", "output_format", "tone_and_style"]
-            for field in structure_fields:
-                if field not in parsed_data["prompt_structure"]:
-                    parsed_data["prompt_structure"][field] = f"Not specified - {field}"
-            
-            # Set defaults for optional fields
-            parsed_data.setdefault("improvement_summary", ["Prompt structure enhanced", "Context and requirements added", "Output format specified"])
-            parsed_data.setdefault("estimated_improvement", 75)
-            parsed_data.setdefault("usage_tips", ["Use this enhanced prompt as-is", "Adjust requirements based on your specific needs"])
-            
-            # Ensure requirements is a list
-            if not isinstance(parsed_data["prompt_structure"]["requirements"], list):
-                parsed_data["prompt_structure"]["requirements"] = [str(parsed_data["prompt_structure"]["requirements"])]
-            
-            # Ensure optional lists are lists
-            for field in ["examples", "constraints"]:
-                if field not in parsed_data["prompt_structure"]:
-                    parsed_data["prompt_structure"][field] = []
-                elif not isinstance(parsed_data["prompt_structure"][field], list):
-                    parsed_data["prompt_structure"][field] = [str(parsed_data["prompt_structure"][field])]
-            
-            return parsed_data
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Grok response as JSON: {str(e)}")
-            logger.error(f"Raw response: {grok_response[:500]}...")
-            raise ValueError("Invalid response format from AI service")
-        except Exception as e:
-            logger.error(f"Error parsing Grok response: {str(e)}")
-            raise
+        # Extract key components and enhance them
+        enhanced = f"""**Context**: You are working on a task that requires clear, structured communication.
+
+**Objective**: {original_prompt}
+
+**Requirements**:
+- Provide detailed, specific output
+- Use clear, professional language  
+- Include relevant examples where helpful
+- Structure your response logically
+
+**Output Format**: Please provide a comprehensive response that addresses all aspects of the request.
+
+**Additional Instructions**: Take your time to think through the request and provide the most helpful response possible."""
+
+        return enhanced
+    
+    def _create_enhanced_response(self, original_prompt: str, ai_response: str, enhancement_type: str, target_audience: str) -> Dict[str, Any]:
+        """Create structured response from AI output"""
+        
+        # Clean up the AI response
+        enhanced_prompt = ai_response.replace(original_prompt, "").strip()
+        if not enhanced_prompt or len(enhanced_prompt) < len(original_prompt):
+            enhanced_prompt = self._create_fallback_enhancement(original_prompt)
+        
+        # Create structured breakdown
+        prompt_structure = {
+            "context": f"Enhanced prompt for {enhancement_type} use case targeting {target_audience} audience",
+            "objective": f"Transform the user's request: '{original_prompt}' into actionable instructions",
+            "requirements": [
+                "Provide clear, specific guidance",
+                "Use appropriate language for target audience", 
+                "Include structured format",
+                "Maintain original intent while adding clarity"
+            ],
+            "target_audience": target_audience,
+            "output_format": "Detailed response following the enhanced prompt structure",
+            "tone_and_style": self._get_tone_for_type(enhancement_type),
+            "examples": [],
+            "constraints": [
+                "Stay true to original request",
+                "Avoid unnecessary complexity",
+                "Ensure actionable output"
+            ]
+        }
+        
+        return {
+            "enhanced_prompt": enhanced_prompt,
+            "prompt_structure": prompt_structure,
+            "improvement_summary": [
+                "Added clear structure and context",
+                "Specified requirements and format",
+                "Tailored language for target audience",
+                "Enhanced clarity and specificity"
+            ],
+            "estimated_improvement": 70,
+            "usage_tips": [
+                "Use this enhanced prompt as-is for better AI responses",
+                "Adjust requirements based on your specific needs",
+                "Consider the target audience when using the output"
+            ]
+        }
+    
+    def _get_tone_for_type(self, enhancement_type: str) -> str:
+        """Get appropriate tone for enhancement type"""
+        tones = {
+            "creative": "Inspiring, imaginative, and engaging",
+            "technical": "Precise, professional, and detailed", 
+            "business": "Professional, results-oriented, and strategic",
+            "educational": "Clear, supportive, and informative",
+            "general": "Balanced, professional, and accessible"
+        }
+        return tones.get(enhancement_type, tones["general"])

@@ -6,7 +6,7 @@
  */
 const API_CONFIG = {
     // Development URL - change this to your deployed backend URL
-    BASE_URL: 'http://localhost:8000',
+    BASE_URL: 'https://prompt-to-json-enhancer.onrender.com/',
     
     // Timeout for API requests (in milliseconds)
     TIMEOUT: 60000,
